@@ -1,0 +1,17 @@
+streamlit
+langchain
+langchain-openai
+langchain-community
+python-dotenv
+tiktoken
+faiss-cpu
+sentence-transformers
+pypdf
+duckduckgo-search
+langchainhub
+google-search-results
+langchain_experimental
+matplotlib
+tabulate
+openpyxl
+mcp

@@ -1,0 +1,14 @@
+{
+    "mcpServers": {
+        "filesystem": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "/Users/songzigg/PythonProjects/streamlit-agent",
+                "/Users/songzigg/data"
+            ],
+            "env": {}
+        }
+    }
+}
