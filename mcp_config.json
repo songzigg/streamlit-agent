@@ -9,6 +9,21 @@
                 "/Users/songzigg/data"
             ],
             "env": {}
+        },
+        "MiniMax": {
+            "command": "uvx",
+            "args": [
+                "minimax-mcp"
+            ],
+            "env": {
+                "MINIMAX_API_KEY": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJHcm91cE5hbWUiOiLmtbfonrrnlKjmiLdfNDIyNzcyODIxNTMzMDQwNjQwIiwiVXNlck5hbWUiOiLmtbfonrrnlKjmiLdfNDIyNzcyODIxNTMzMDQwNjQwIiwiQWNjb3VudCI6IiIsIlN1YmplY3RJRCI6IjE5NjU4MDI3NzU4MzI5NjE1NzYiLCJQaG9uZSI6IjE4MjAyODM4MjA4IiwiR3JvdXBJRCI6IjE5NjU4MDI3NzU4MjQ1NzI5NjgiLCJQYWdlTmFtZSI6IiIsIk1haWwiOiIiLCJDcmVhdGVUaW1lIjoiMjAyNS0wOS0xNiAwMDoxMjoxOSIsIlRva2VuVHlwZSI6MSwiaXNzIjoibWluaW1heCJ9.StmKAIJcmoWc_jgyb5nobyeVkr82PhYhlzcs03PuGTAf0Tj5dAGLPtuH_AA5bQ4wzTviYM_7t2ryRZRAFka2QpujoJ-xHpJTgBKKsL96jfDa1XPdVu1DANSn1lUAqnIsXTWnrIuzmgWWfExD8UXyZEjfAZQmU8KgBxh8hGjP26FatRYoHjWYSsnPJUAbqecXNrZdBcx5P7QVrTNNQqLhuZXnP5o0dSEDg4LFbqiDagC3m1kvo91NMUq3hmBpA9nRRDnl_tg9uiyVCdZ344qkERQYqb8dlZhGN6zF8Ipa4TqqRdF_-xiir8VAmB0q1wZZCn9nvLRSUmz5rPPBYq0XTw",
+                "MINIMAX_MCP_BASE_PATH": "/Users/songzigg/data",
+                "MINIMAX_API_HOST": "https://api.minimaxi.com",
+                "MINIMAX_API_RESOURCE_MODE": "url"
+            }
+        },
+        "alphavantage": {
+            "url": "https://mcp.alphavantage.co/mcp?apikey=GWX88EWNSCDGAO4C"
         }
     }
 }

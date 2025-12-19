@@ -1,13 +1,15 @@
 streamlit
+openai
 langchain
-langchain-openai
 langchain-community
-python-dotenv
-tiktoken
+langchain-openai
 faiss-cpu
+python-dotenv
+beautifulsoup4
+duckduckgo-search
+pandas
 sentence-transformers
 pypdf
-duckduckgo-search
 langchainhub
 google-search-results
 langchain_experimental
@@ -15,3 +17,5 @@ matplotlib
 tabulate
 openpyxl
 mcp
+httpx
+akshare

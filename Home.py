@@ -44,6 +44,9 @@ This application demonstrates the power of **LangChain** combined with **Streaml
 9.  **🎛️ MCP Control Center**:
     - Capabilities: Manage Servers, Inject Context, Run Tools.
     - Status: *Ready*
+10. **🦸‍♂️ Super Chat**:
+    - Capabilities: Unified Agent, Web Search, Image Gen, Memory.
+    - Status: *Live!*
 
 ---
 *Built with [Streamlit](https://streamlit.io) and [LangChain](https://python.langchain.com/)* 

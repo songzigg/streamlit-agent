@@ -5,6 +5,8 @@ import os
 import shutil
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+# from mcp.client.sse import sse_client # Replaced by custom HTTP client
+from mcp_http_client import StatelessMcpSession
 
 st.set_page_config(page_title="MCP Control Center", page_icon="🎛️", layout="wide")
 st.header("🎛️ MCP Control Center")
@@ -30,59 +32,85 @@ def load_config():
 config = load_config()
 
 # Helper to run async MCP calls
+# Helper to run async MCP calls
 async def connect_and_fetch(server_name, server_config):
-    server_params = StdioServerParameters(
-        command=server_config["command"],
-        args=server_config["args"],
-        env={**os.environ, **server_config.get("env", {})}
-    )
-    
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            
-            # Fetch Resources
-            try:
-                resources_resp = await session.list_resources()
-                resources = resources_resp.resources if resources_resp else []
-            except Exception:
-                # Server might not support resources
-                resources = []
-            
-            # Fetch Tools
-            try:
-                tools_resp = await session.list_tools()
-                tools = tools_resp.tools if tools_resp else []
-            except Exception:
-                tools = []
-            
-            return resources, tools
+    # Strategy Pattern for Connection
+    if "url" in server_config:
+        # HTTP Stateless Connection
+        try:
+            async with StatelessMcpSession(server_config["url"]) as session:
+                await session.initialize()
+                # StatelessSession implements connect_and_fetch internally via list_xxx
+                
+                # Fetch Resources
+                try:
+                    resources_resp = await session.list_resources()
+                    resources = resources_resp.resources
+                except:
+                    resources = []
+                
+                # Fetch Tools
+                try:
+                    tools_resp = await session.list_tools()
+                    tools = tools_resp.tools
+                except:
+                    tools = []
+
+                return resources, tools
+        except Exception as e:
+            raise Exception(f"HTTP Connection failed: {e}")
+    elif "command" in server_config:
+        # Stdio Connection
+        server_params = StdioServerParameters(
+            command=server_config["command"],
+            args=server_config["args"],
+            env={**os.environ, **server_config.get("env", {})}
+        )
+        async with stdio_client(server_params) as (read, write):
+             async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await _fetch_internal(session)
+    else:
+        raise ValueError("Invalid config: Missing 'command' or 'url'")
+
 
 async def run_tool(server_name, server_config, tool_name, tool_args):
-    server_params = StdioServerParameters(
-        command=server_config["command"],
-        args=server_config["args"],
-        env={**os.environ, **server_config.get("env", {})}
-    )
-    
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(tool_name, arguments=tool_args)
-            return result
+    if "url" in server_config:
+         async with StatelessMcpSession(server_config["url"]) as session:
+                await session.initialize()
+                return await session.call_tool(tool_name, arguments=tool_args)
+    elif "command" in server_config:
+        server_params = StdioServerParameters(
+            command=server_config["command"],
+            args=server_config["args"],
+            env={**os.environ, **server_config.get("env", {})}
+        )
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments=tool_args)
+                return result
+    else:
+        raise ValueError("Invalid config: Missing 'command' or 'url'")
 
 async def read_resource(server_name, server_config, resource_uri):
-     server_params = StdioServerParameters(
-        command=server_config["command"],
-        args=server_config["args"],
-        env={**os.environ, **server_config.get("env", {})}
-    )
-    
-     async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.read_resource(resource_uri)
-            return result
+     if "url" in server_config:
+        async with StatelessMcpSession(server_config["url"]) as session:
+                await session.initialize()
+                return await session.read_resource(resource_uri)
+     elif "command" in server_config:
+         server_params = StdioServerParameters(
+            command=server_config["command"],
+            args=server_config["args"],
+            env={**os.environ, **server_config.get("env", {})}
+        )
+         async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.read_resource(resource_uri)
+                return result
+     else:
+         raise ValueError("Invalid config: Missing 'command' or 'url'")
 
 # 2. Tabs
 tab_servers, tab_resources, tab_tools, tab_context = st.tabs([
@@ -114,7 +142,9 @@ with tab_servers:
                     except Exception as e:
                         st.error(f"Connection failed: {e}")
                         # Check dependencies
-                        if "npx" in config["mcpServers"][selected_server]["command"]:
+                        # Check dependencies
+                        cmd = config["mcpServers"][selected_server].get("command", "")
+                        if "npx" in cmd:
                              if not shutil.which("npx"):
                                  st.warning("`npx` not found. Is Node.js installed?")
     
