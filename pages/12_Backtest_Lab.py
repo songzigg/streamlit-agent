@@ -308,6 +308,14 @@ if st.button("🚀 启动任务", use_container_width=True):
             st.line_chart(equity_curve)
         else:
             st.info("No equity data available.")
+
+        # Technical Signal Visualization
+        from visualizer import plot_trading_chart
+        st.subheader("📡 策略信号视图")
+        with st.spinner("正在生成技术分析图表..."):
+            history = getattr(strat, 'trade_history', [])
+            fig = plot_trading_chart(df, history, strategy=strat)
+            st.pyplot(fig)
         
         # Tabs for details
         tab_log, tab_trades, tab_data = st.tabs(["📜 交易日志", "📈 交易统计", "🔍 数据预览"])

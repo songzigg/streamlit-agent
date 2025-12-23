@@ -9,8 +9,10 @@ class BaseStrategy(bt.Strategy):
     )
 
     def __init__(self):
+        super().__init__()
         self.order = None
         self.log_data = []
+        self.trade_history = [] # For plotting markers: (datetime, price, type)
 
     def log(self, txt, dt=None):
         """ Logging function for this strategy """
@@ -22,26 +24,25 @@ class BaseStrategy(bt.Strategy):
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
-            # Buy/Sell order submitted/accepted to/by broker - Nothing to do
             return
 
-        # Check if an order has been completed
-        # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
+            dt = self.datas[0].datetime.datetime(0)
             if order.isbuy():
                 self.log(
                     'BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
                     (order.executed.price,
                      order.executed.value,
                      order.executed.comm))
-
                 self.buyprice = order.executed.price
                 self.buycomm = order.executed.comm
+                self.trade_history.append({'dt': dt, 'price': order.executed.price, 'type': 'buy'})
             else:  # Sell
                 self.log('SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
                          (order.executed.price,
                           order.executed.value,
                           order.executed.comm))
+                self.trade_history.append({'dt': dt, 'price': order.executed.price, 'type': 'sell'})
 
             self.bar_executed = len(self)
 

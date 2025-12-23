@@ -75,6 +75,12 @@ def get_signal_info(res):
 
 target_symbols = [s.strip() for s in symbols_raw.replace('\n', ',').split(',') if s.strip()]
 
+# Initialize session state for persistent results
+if "scan_results" not in st.session_state:
+    st.session_state.scan_results = None
+if "last_target_symbols" not in st.session_state:
+    st.session_state.last_target_symbols = []
+
 if st.button("🔍 开始多策略实时扫描", use_container_width=True):
     if not target_symbols:
         st.warning("股票池为空。")
@@ -103,6 +109,7 @@ if st.button("🔍 开始多策略实时扫描", use_container_width=True):
         
         try:
             # 1. Fetch recent data (once per symbol)
+            # Signal monitor should ideally fetch fresh data, so use_cache=False or short cache
             df = loader.get_stock_data(symbol, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"), use_cache=False)
             
             if df.empty:
@@ -115,6 +122,8 @@ if st.button("🔍 开始多策略实时扫描", use_container_width=True):
                 row_data["当前价格"] = f"¥{curr_price:.2f}"
                 
                 # 2. Run backtest for each selected strategy
+                row_data["df"] = df
+                row_data["strat_data"] = True
                 for s_name in selected_strategies:
                     step_count += 1
                     status_text.text(f"⏳ 正在分析: {symbol} - {s_name} ({step_count}/{total_steps})")
@@ -124,6 +133,7 @@ if st.button("🔍 开始多策略实时扫描", use_container_width=True):
                     
                     signal_label, score = get_signal_info(res)
                     row_data[s_name] = signal_label
+                    row_data[f"strat_{s_name}"] = res['strat']
                     total_score += score
                     
                     # Track average recent return
@@ -141,6 +151,16 @@ if st.button("🔍 开始多策略实时扫描", use_container_width=True):
         results.append(row_data)
 
     status_text.text("✅ 扫描完成!")
+    # Save to session state
+    st.session_state.scan_results = results
+    st.session_state.last_target_symbols = target_symbols
+    st.session_state.selected_strategies = selected_strategies
+
+# --- Display Logic (Persists outside button click) ---
+if st.session_state.scan_results is not None:
+    results = st.session_state.scan_results
+    last_target_symbols = st.session_state.last_target_symbols
+    active_strategies = st.session_state.selected_strategies
     
     # Display Result Table
     res_df = pd.DataFrame(results)
@@ -151,6 +171,11 @@ if st.button("🔍 开始多策略实时扫描", use_container_width=True):
     if "综合评分" in res_df.columns:
         res_df = res_df.sort_values(by="综合评分", ascending=False)
     
+    # Display columns: Code, Name, Price, [Strategies], Score, Return
+    display_cols = ["代码", "名称", "当前价格"] + active_strategies + ["综合评分", "平均收益率 (%)"]
+    # Filter to only existing columns
+    display_cols = [c for c in display_cols if c in res_df.columns]
+
     # Style the table
     def style_signals(val):
         if not isinstance(val, str): return ''
@@ -159,51 +184,82 @@ if st.button("🔍 开始多策略实时扫描", use_container_width=True):
         if "HOLD" in val: return 'background-color: rgba(0, 0, 255, 0.1)'
         return ''
 
-    # Define columns to style (the strategy names)
     st.dataframe(
-        res_df.style.applymap(style_signals, subset=selected_strategies),
+        res_df[display_cols].style.applymap(style_signals, subset=[c for c in active_strategies if c in res_df.columns]),
         use_container_width=True
     )
 
-    # AI Analysis of the Consensus
+    # --- Detailed Visuals ---
+    st.divider()
+    st.subheader("🔍 单股多策略共振详图")
+    # Store complete results in a dict for easy access
+    detailed_results = {r['代码']: r for r in results}
+    
+    # Filter target symbols to those that actually have results
+    avail_symbols = [s for s in last_target_symbols if s in detailed_results]
+    
+    selected_stock = st.selectbox("选择股票查看详细信号复现图", options=avail_symbols)
+    
+    if selected_stock and selected_stock in detailed_results:
+        target_res = detailed_results[selected_stock]
+        if "strat_data" in target_res:
+            from visualizer import plot_trading_chart
+            
+            with st.spinner(f"正在分析 {selected_stock} 的技术共振..."):
+                # Combine trade history from ALL strategies
+                all_trades = []
+                for sname in active_strategies:
+                    if f"strat_{sname}" in target_res:
+                        s_obj = target_res[f"strat_{sname}"]
+                        all_trades.extend(getattr(s_obj, 'trade_history', []))
+                
+                df_obj = target_res["df"]
+                # Passing None to strategy to avoid messy indicators in summary view
+                fig = plot_trading_chart(df_obj, all_trades, strategy=None)
+                st.pyplot(fig)
+        else:
+            st.info("该股票暂无详细回测数据。")
+
+    # AI Analysis
     api_key = configure_api_key()
     if api_key:
-        with st.spinner("🤖 AI 正在进行多维度策略共振分析..."):
-            try:
-                llm = ChatOpenAI(
-                    model='deepseek-chat',
-                    openai_api_key=api_key,
-                    openai_api_base='https://api.deepseek.com/v1'
-                )
-                
-                prompt = ChatPromptTemplate.from_template("""
-                你是一位专业的量化交易员。你刚才对关注股票池进行了多策略实时监控，以下是综合结果：
-                
-                策略组合：{strategies}
-                监控矩阵：
-                {results_table}
-                
-                请基于多策略共振情况给出行动建议：
-                1. **强共振挖掘**：哪些股票在多个策略下同时发出了 BUY 信号？这种共振意味着什么？
-                2. **策略分歧处理**：如果某只股票在策略 A 是 BUY，但在策略 B 是 SELL，你建议如何操作？
-                3. **综合评分最高者分析**：针对“综合评分”最高的几只股票，分析其潜在的趋势强度。
-                4. **风险预警**：基于多策略结果，当前市场是否存在普遍的回撤风险或虚假信号？
-                5. **实战指导**：如何根据这些信号进行仓位分配？
-                
-                请使用专业、简洁且利于实战的语言。
-                """)
-                
-                chain = prompt | llm
-                ai_resp = chain.invoke({
-                    "strategies": ", ".join(selected_strategies),
-                    "results_table": res_df.to_markdown()
-                })
-                
-                st.divider()
-                st.header("🤖 AI 策略共振分析报告")
-                st.markdown(ai_resp.content)
-            except Exception as e:
-                st.info(f"AI 建议模块暂不可用: {e}")
+        if st.button("🤖 生成 AI 策略共振分析报告"):
+            with st.spinner("AI 正在深度分析中..."):
+                try:
+                    llm = ChatOpenAI(
+                        model='deepseek-chat',
+                        openai_api_key=api_key,
+                        openai_api_base='https://api.deepseek.com/v1'
+                    )
+                    
+                    prompt = ChatPromptTemplate.from_template("""
+                    你是一位专业的量化交易员。你刚才对关注股票池进行了多策略实时监控，以下是综合结果：
+                    
+                    策略组合：{strategies}
+                    监控矩阵：
+                    {results_table}
+                    
+                    请基于多策略共振情况给出行动建议：
+                    1. **强共振挖掘**：哪些股票在多个策略下同时发出了 BUY 信号？这种共振意味着什么？
+                    2. **策略分歧处理**：如果某只股票在策略 A 是 BUY，但在策略 B 是 SELL，你建议如何操作？
+                    3. **综合评分最高者分析**：针对“综合评分”最高的几只股票，分析其潜在的趋势强度。
+                    4. **风险预警**：基于多策略结果，当前市场是否存在普遍的回撤风险或虚假信号？
+                    5. **实战指导**：如何根据这些信号进行仓位分配？
+                    
+                    请使用专业、简洁且利于实战的语言。
+                    """)
+                    
+                    chain = prompt | llm
+                    ai_resp = chain.invoke({
+                        "strategies": ", ".join(active_strategies),
+                        "results_table": res_df.to_markdown()
+                    })
+                    
+                    st.divider()
+                    st.header("🤖 AI 策略共振分析报告")
+                    st.markdown(ai_resp.content)
+                except Exception as e:
+                    st.info(f"AI 建议模块暂不可用: {e}")
 else:
     st.info("👈 请在左侧选择监控策略并输入股票代码，点击按钮开始多维度实时分析。")
     st.warning("注：综合评分基于策略共识（BUY=+1, SELL=-1）。评分越高，代表多策略一致看多。")

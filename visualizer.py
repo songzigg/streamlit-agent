@@ -22,7 +22,7 @@ def plot_trading_chart(df, trade_history, strategy=None):
         ax1.plot(df.index, df['close'], label='Close Price', color='#1f77b4', linewidth=1.5, alpha=0.8)
     
     # 2. Plot Indicators (Optional)
-    if strategy:
+    if strategy is not None:
         import backtrader as bt
         # Use a more robust way to iterate over attributes
         for attr_name in dir(strategy):
