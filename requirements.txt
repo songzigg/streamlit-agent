@@ -19,3 +19,5 @@ openpyxl
 mcp
 httpx
 akshare
+backtrader
+

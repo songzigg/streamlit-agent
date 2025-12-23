@@ -5,23 +5,38 @@ import json
 from datetime import datetime
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from utils import configure_api_key
+from utils import configure_api_key, configure_serper_api_key
+from langchain_community.utilities import GoogleSerperAPIWrapper
 
 st.set_page_config(page_title="Stock Analysis (AKShare)", page_icon="🇨🇳", layout="wide")
 
 # --- Configuration ---
 deepseek_api_key = configure_api_key()
+serper_api_key = configure_serper_api_key()
 
 # --- Helper Functions ---
 
-@st.cache_data(ttl=60) # Cache heavy spot data for 60s
+@st.cache_data(ttl=60)
 def get_a_share_spot():
     """Fetch real-time spot data for ALL A-shares (for PE/PB/Turnover)."""
     try:
         # returns huge dataframe
         df = ak.stock_zh_a_spot_em()
         return df
-    except Exception:
+    except Exception as e:
+        st.error(f"AKShare Spot Data Error: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(ttl=60)
+def get_individual_spot(symbol):
+    """Fallback fetch for a single stock's real-time quote."""
+    try:
+        df = ak.stock_individual_info_em(symbol=symbol)
+        # Process individual info into a format similar to spot_df if needed
+        # but easier to just use it as a dictionary
+        return df
+    except Exception as e:
+        st.error(f"AKShare Individual Data Error: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -88,6 +103,18 @@ def get_news(symbol):
     except:
         return pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def get_serper_news(symbol, name):
+    try:
+        search = GoogleSerperAPIWrapper(serper_api_key=serper_api_key, type="news")
+        query = f"{name} {symbol} 股票 财经 新闻"
+        results = search.results(query)
+        # Serper news results are in 'news' key
+        return results.get('news', [])
+    except Exception as e:
+        st.sidebar.error(f"Serper Search Error: {e}")
+        return []
+
 # --- UI Logic ---
 
 st.title("🇨🇳 A股五维全景扫描 (5-Dim Scanner)")
@@ -104,7 +131,7 @@ if "ak_symbol" in st.session_state:
     symbol = st.session_state.ak_symbol
     
     # 1. Fetch Spot Data (Global Filter for Dimensions 1 & 2)
-    with st.spinner("🚀 正在扫描全市场数据..."):
+    with st.spinner("🚀 正在扫描行情数据..."):
         spot_df = get_a_share_spot()
         
     # Find our stock
@@ -113,12 +140,33 @@ if "ak_symbol" in st.session_state:
         mask = spot_df['代码'] == symbol
         if mask.any():
             target_row = spot_df[mask].iloc[0]
+            # Standardize column names if needed
+            # spot_em typical columns: 代码, 名称, 最新价, 涨跌幅, 市盈率-动态, 市净率, 总市值, 换手率, 量比, 振幅
         else:
-            st.error(f"未在A股列表中找到 {symbol}")
+            st.warning(f"全量行情中未涉及 {symbol}，尝试拉取单股数据...")
+    
+    if target_row is None:
+        # Fallback to individual info
+        indiv_df = get_individual_spot(symbol)
+        if not indiv_df.empty:
+            # indiv_df is usually: item, value
+            data_dict = dict(zip(indiv_df['item'], indiv_df['value']))
+            # Map indiv info to what target_row expects
+            target_row = {
+                '代码': symbol,
+                '名称': data_dict.get('股票简称', '-'),
+                '最新价': data_dict.get('最新价', 0),
+                '涨跌幅': data_dict.get('涨跌幅', 0),
+                '市盈率-动态': data_dict.get('市盈率-动态', '-'),
+                '市净率': data_dict.get('市净率', '-'),
+                '总市值': data_dict.get('总市值', '-'),
+                '换手率': data_dict.get('换手率', '-'),
+                '量比': data_dict.get('量比', '-'),
+                '振幅': data_dict.get('振幅', '-')
+            }
+        else:
+            st.error("无法连接实时行情服务 (全量与单股均失败)")
             st.stop()
-    else:
-        st.error("无法连接实时行情服务")
-        st.stop()
 
     # Extract 5-Dim Metrics
     name = target_row['名称']
@@ -168,6 +216,7 @@ if "ak_symbol" in st.session_state:
         holders_df = get_holders(symbol)
         flow_df = get_capital_flow(symbol)
         news_df = get_news(symbol)
+        serper_news = get_serper_news(symbol, name)
 
     # --- 5-Dim Tabs ---
     tab_tc, tab_vf, tab_se, tab_ai = st.tabs(["📈 技术 & 资金 (Tech/Cap)", "🏢 基本面 & 估值 (Fund/Val)", "📰 情绪 & 概念 (Sent)", "🤖 AI 五维评分 (Report)"])
@@ -264,17 +313,33 @@ if "ak_symbol" in st.session_state:
     # 3. Sentiment
     with tab_se:
         st.subheader("📰 市场情绪 & 概念")
-        # TODO: Add Sector/Concept Tags if possible
-        # Currently showing news
-        st.markdown(f"#### 🔍 {name} 相关舆情")
-        if not news_df.empty:
-             for idx, row in news_df.head(8).iterrows():
-                title = row.get('新闻标题', '无标题')
-                date = row.get('发布时间', '-')
-                url = row.get('文章链接', '#')
-                st.markdown(f"- [{title}]({url}) ` {date} `")
-        else:
-            st.info("暂无近期舆情")
+        
+        # Two columns for news sources
+        col_ak, col_serp = st.columns(2)
+        
+        with col_ak:
+            st.markdown(f"#### 🏛️ 东方财富 (AKShare)")
+            if not news_df.empty:
+                for idx, row in news_df.head(10).iterrows():
+                    title = row.get('新闻标题', '无标题')
+                    date = row.get('发布时间', '-')
+                    url = row.get('文章链接', '#')
+                    st.markdown(f"- [{title}]({url}) ` {date} `")
+            else:
+                st.info("暂无 AKShare 舆情")
+
+        with col_serp:
+            st.markdown(f"#### 🌎 全网搜索 (Serper.dev)")
+            if serper_news:
+                for item in serper_news[:10]:
+                    title = item.get('title', '无标题')
+                    date = item.get('date', '-')
+                    url = item.get('link', '#')
+                    source = item.get('source', 'Unknown')
+                    st.markdown(f"- [{title}]({url})")
+                    st.caption(f"来源: {source} | 时间: {date}")
+            else:
+                st.info("暂无 Serper 搜索结果")
 
     # 4. AI 5-Dim Report
     with tab_ai:
@@ -286,7 +351,9 @@ if "ak_symbol" in st.session_state:
                 dim_cap = flow_df.head(5).to_markdown() if not flow_df.empty else "No Flow Data"
                 dim_val = f"PE-TTM: {pe_ttm}, PB: {pb}, MktCap: {mkt_cap}"
                 dim_fund = fin_df.head(3).to_markdown() if not fin_df.empty else "No Fund Data"
-                dim_sent = news_df.head(3).to_markdown() if not news_df.empty else "No News"
+                dim_ak_news = news_df.head(3).to_markdown() if not news_df.empty else "No AKShare News"
+                dim_serp_news = str(serper_news[:3]) if serper_news else "No Serper News"
+                dim_sent = f"AKShare: {dim_ak_news}\nSerper: {dim_serp_news}"
                 
                 prompt = ChatPromptTemplate.from_template("""
                 你是一位专业的A股基金经理。请基于以下【五维数据】对 {name} ({symbol}) 进行深度复盘，并给出评分（0-10分）。

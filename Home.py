@@ -47,6 +47,15 @@ This application demonstrates the power of **LangChain** combined with **Streaml
 10. **🦸‍♂️ Super Chat**:
     - Capabilities: Unified Agent, Web Search, Image Gen, Memory.
     - Status: *Live!*
+11. **📈 Stock Analysis**:
+    - Capabilities: AKShare Real-time Data, Financials, AI Market Summary.
+    - Status: *Ready*
+12. **🧪 Backtest Lab**:
+    - Capabilities: 7+ Strategies (MA, MACD, Turtle...), Optimization, DIY Composite.
+    - Status: *Ready*
+13. **🕵️ AI Strategy Audit**:
+    - Capabilities: Automated 7-Strategy Batch Scanning, DeepSeek AI Diagnosis.
+    - Status: *New!*
 
 ---
 *Built with [Streamlit](https://streamlit.io) and [LangChain](https://python.langchain.com/)* 

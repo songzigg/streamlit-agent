@@ -19,6 +19,22 @@ def configure_api_key():
             
     return api_key
 
+def configure_serper_api_key():
+    load_dotenv()
+    api_key = os.getenv("SERPER_API_KEY")
+    
+    if not api_key:
+        api_key = st.sidebar.text_input(
+            "Serper API Key", 
+            type="password",
+            help="Get your API key from https://serper.dev/"
+        )
+        if not api_key:
+            st.warning("Please add your Serper API key to continue.")
+            st.stop()
+            
+    return api_key
+
 def configure_serpapi_key():
     load_dotenv()
     api_key = os.getenv("SERPAPI_API_KEY")
