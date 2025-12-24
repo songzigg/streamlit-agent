@@ -101,51 +101,54 @@ if st.button("🚀 开启全维度诊断", use_container_width=True):
     st.subheader("📊 扫描结果汇总")
     st.dataframe(res_df.drop(columns=['_raw_ret']), use_container_width=True)
 
-    # 5. AI Analysis
+    # 5. Manual AI Analysis Button
+    st.divider()
     api_key = configure_api_key()
     if api_key:
-        with st.spinner("🤖 AI 正在对上述数据进行深度建模与逻辑推理..."):
-            try:
-                llm = ChatOpenAI(
-                    model='deepseek-chat',
-                    openai_api_key=api_key,
-                    openai_api_base='https://api.deepseek.com/v1',
-                    max_tokens=1500
-                )
-                
-                prompt = ChatPromptTemplate.from_template("""
-                你是一位资深的量化策略分析师。请分析以下针对股票代码 {symbol} 的多种量化策略回测结果。
-                
-                回测数据汇总：
-                {results_table}
-                
-                请提供深入的专业诊断方案：
-                1. **冠军解读**：识别表现最好的策略，从指标原理和该时间段的股价形态（趋势/震荡）解释其胜出的原因。
-                2. **风险评估**：重点分析最大回撤，识别哪些策略在这种行情下表现得过于脆弱。
-                3. **资产配置建议**：如果你是投资经理，你会如何通过整合这些信号来操作这只股票？
-                4. **参数优化建议**：针对当前发现的缺陷，建议调优哪些具体参数？
-                5. **总结性评分**：给这只股票基于目前各策略的响应情况打分（1-10分）。
-                
-                请严格使用 Markdown 格式，语言风格要求极简、犀利且极具专业性。
-                """)
-                
-                chain = prompt | llm
-                ai_response = chain.invoke({
-                    "symbol": symbol,
-                    "results_table": res_df.to_markdown()
-                })
-                
-                st.divider()
-                st.header("🧠 AI 策略诊断报告 (诊断书)")
-                st.markdown(ai_response.content)
-                
-                # Downloadable MD
-                full_md = f"# {symbol} 策略诊断报告\n\n## 1. 回测数据概览\n\n{res_df.to_markdown()}\n\n## 2. AI 深度诊断结论\n\n{ai_response.content}"
-                st.download_button("📥 下载完整诊断报告 (.md)", data=full_md, file_name=f"AI_Audit_{symbol}.md")
-                
-            except Exception as ex:
-                st.error(f"AI 生成过程中发生异常: {ex}")
+        if st.button("🤖 生成 AI 策略诊断报告", use_container_width=True):
+            with st.spinner("🤖 AI 正在对上述数据进行深度建模与逻辑推理..."):
+                try:
+                    llm = ChatOpenAI(
+                        model='deepseek-chat',
+                        openai_api_key=api_key,
+                        openai_api_base='https://api.deepseek.com/v1',
+                        max_tokens=1500
+                    )
+                    
+                    prompt = ChatPromptTemplate.from_template("""
+                    你是一位资深的量化策略分析师。请分析以下针对股票代码 {symbol} 的多种量化策略回测结果。
+                    
+                    回测数据汇总：
+                    {results_table}
+                    
+                    请提供深入的专业诊断方案：
+                    1. **冠军解读**：识别表现最好的策略，从指标原理和该时间段的股价形态（趋势/震荡）解释其胜出的原因。
+                    2. **风险评估**：重点分析最大回撤，识别哪些策略在这种行情下表现得过于脆弱。
+                    3. **资产配置建议**：如果你是投资经理，你会如何通过整合这些信号来操作这只股票？
+                    4. **参数优化建议**：针对当前发现的缺陷，建议调优哪些具体参数？
+                    5. **总结性评分**：给这只股票基于目前各策略的响应情况打分（1-10分）。
+                    
+                    请严格使用 Markdown 格式，语言风格要求极简、犀利且极具专业性。
+                    """)
+                    
+                    chain = prompt | llm
+                    ai_response = chain.invoke({
+                        "symbol": symbol,
+                        "results_table": res_df.to_markdown()
+                    })
+                    
+                    st.divider()
+                    st.header("🧠 AI 策略诊断报告 (诊断书)")
+                    st.markdown(ai_response.content)
+                    
+                    # Downloadable MD
+                    full_md = f"# {symbol} 策略诊断报告\n\n## 1. 回测数据概览\n\n{res_df.to_markdown()}\n\n## 2. AI 深度诊断结论\n\n{ai_response.content}"
+                    st.download_button("📥 下载完整诊断报告 (.md)", data=full_md, file_name=f"AI_Audit_{symbol}.md")
+                    
+                except Exception as ex:
+                    st.error(f"AI 生成过程中发生异常: {ex}")
     else:
-        st.warning("⚠️ 检测到未配置 DeepSeek API Key，无法激活 AI 诊断模块。")
+        st.warning("⚠️ 检测到未配置 DeepSeek API Key，无法激活 AI 诊断模块。请在侧边栏配置。")
+
 else:
     st.info("👈 在左侧设置好回测参数，点击下方按钮开始‘会诊’。")

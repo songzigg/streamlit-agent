@@ -225,51 +225,54 @@ if st.button("🚀 启动任务", use_container_width=True):
         st.subheader("📋 全策略表现对比")
         st.table(res_df.drop(columns=['_ret']))
         
-        # AI Analysis
+        # Manual AI Analysis Button
+        st.divider()
         deepseek_api_key = configure_api_key()
         if deepseek_api_key:
-            with st.spinner("🤖 AI 正在深度剖析结果..."):
-                try:
-                    llm = ChatOpenAI(
-                        model='deepseek-chat',
-                        openai_api_key=deepseek_api_key,
-                        openai_api_base='https://api.deepseek.com/v1',
-                        max_tokens=1000
-                    )
-                    
-                    prompt = ChatPromptTemplate.from_template("""
-                    你是一位资深的量化策略分析师。请分析以下针对股票代码 {symbol} 的多种量化策略回测结果。
-                    
-                    回测数据如下：
-                    {results_table}
-                    
-                    请提供以下分析：
-                    1. 表现最好的策略是什么？它的优势在于捕捉了什么样的行情特征？
-                    2. 考虑到收益率、回撤和风险比（夏普），你最推荐哪一个策略？
-                    3. 基于数据，你对该股票目前的投资建议是什么（仅供参考）？
-                    4. 建议用户如何针对目前的行情微调参数？
-                    
-                    请使用 Markdown 格式输出，语言简洁专业。
-                    """)
-                    
-                    chain = prompt | llm
-                    ai_response = chain.invoke({
-                        "symbol": symbol,
-                        "results_table": res_df.to_markdown()
-                    })
-                    
-                    st.divider()
-                    st.header("🤖 AI 策略诊断报告")
-                    st.markdown(ai_response.content)
-                    
-                    # Report Download
-                    st.divider()
-                    full_report = f"# {symbol} 批量回测分析报告\n\n## 策略对比\n\n{res_df.to_markdown()}\n\n## AI 诊断\n\n{ai_response.content}"
-                    st.download_button("📥 下载完整 AI 分析报告", data=full_report, file_name=f"AI_Analysis_{symbol}.md")
-                except Exception as ex:
-                    st.error(f"AI 分析生成失败: {ex}")
+            if st.button("🤖 生成 AI 策略诊断报告", use_container_width=True):
+                with st.spinner("🤖 AI 正在深度剖析结果..."):
+                    try:
+                        llm = ChatOpenAI(
+                            model='deepseek-chat',
+                            openai_api_key=deepseek_api_key,
+                            openai_api_base='https://api.deepseek.com/v1',
+                            max_tokens=1000
+                        )
+                        
+                        prompt = ChatPromptTemplate.from_template("""
+                        你是一位资深的量化策略分析师。请分析以下针对股票代码 {symbol} 的多种量化策略回测结果。
+                        
+                        回测数据如下：
+                        {results_table}
+                        
+                        请提供以下分析：
+                        1. 表现最好的策略是什么？它的优势在于捕捉了什么样的行情特征？
+                        2. 考虑到收益率、回撤和风险比（夏普），你最推荐哪一个策略？
+                        3. 基于数据，你对该股票目前的投资建议是什么（仅供参考）？
+                        4. 建议用户如何针对目前的行情微调参数？
+                        
+                        请使用 Markdown 格式输出，语言简洁专业。
+                        """)
+                        
+                        chain = prompt | llm
+                        ai_response = chain.invoke({
+                            "symbol": symbol,
+                            "results_table": res_df.to_markdown()
+                        })
+                        
+                        st.divider()
+                        st.header("🤖 AI 策略诊断报告")
+                        st.markdown(ai_response.content)
+                        
+                        # Report Download
+                        st.divider()
+                        full_report = f"# {symbol} 批量回测分析报告\n\n## 策略对比\n\n{res_df.to_markdown()}\n\n## AI 诊断\n\n{ai_response.content}"
+                        st.download_button("📥 下载完整 AI 分析报告", data=full_report, file_name=f"AI_Analysis_{symbol}.md")
+                    except Exception as ex:
+                        st.error(f"AI 分析生成失败: {ex}")
         else:
-            st.warning("未配置 DeepSeek API Key，无法生成 AI 诊断报告。")
+            st.warning("未配置 DeepSeek API Key，无法生成 AI 诊断报告。请在侧边栏配置。")
+
 
     elif mode == "标准回测 (Single)":
         # 2. Run Single Backtest
