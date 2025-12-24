@@ -20,4 +20,5 @@ mcp
 httpx
 akshare
 backtrader
+plotly
 

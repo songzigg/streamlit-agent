@@ -58,13 +58,34 @@ with st.sidebar:
     lookback_days = st.slider("历史回顾天数 (用于计算指标)", 30, 200, 100)
     pos_size = st.slider("模拟仓位 (%)", 10, 100, 95) / 100
 
-def get_signal_info(res):
+def get_signal_info(res, df):
     """Analyze backtest result to find the latest signal and a numeric score."""
     strat = res['strat']
-    latest_logs = strat.log_data[-3:] if strat.log_data else []
     
-    is_buy = any("BUY CREATE" in log for log in latest_logs)
-    is_sell = any("SELL CREATE" in log for log in latest_logs)
+    # 1. Get the latest date from the data as the 'reference date'
+    if df.empty:
+        return "⚪ WAIT", 0
+    latest_data_date = df.index[-1].date()
+    
+    # 2. Extract recent logs (last 5 to be safe)
+    latest_logs = strat.log_data[-5:] if strat.log_data else []
+    
+    # 3. Filter logs that happened within the last 3 trading days
+    recent_signals = []
+    for log in latest_logs:
+        try:
+            # Log format: "YYYY-MM-DD, Message"
+            log_date_str = log.split(',')[0].strip()
+            log_date = datetime.strptime(log_date_str, "%Y-%m-%d").date()
+            
+            # Check if within 3 days window
+            if (latest_data_date - log_date).days <= 3:
+                recent_signals.append(log)
+        except Exception:
+            continue
+            
+    is_buy = any("BUY CREATE" in log for log in recent_signals)
+    is_sell = any("SELL CREATE" in log for log in recent_signals)
     
     if is_buy: return "🟢 BUY", 1
     if is_sell: return "🔴 SELL", -1
@@ -131,7 +152,7 @@ if st.button("🔍 开始多策略实时扫描", use_container_width=True):
                     strat_cls = strat_map[s_name]
                     res = engine.run(strat_cls, df, pos_size=pos_size)
                     
-                    signal_label, score = get_signal_info(res)
+                    signal_label, score = get_signal_info(res, df)
                     row_data[s_name] = signal_label
                     row_data[f"strat_{s_name}"] = res['strat']
                     total_score += score

@@ -98,3 +98,88 @@ def plot_trading_chart(df, trade_history, strategy=None):
     fig.tight_layout()
     
     return fig
+
+def plot_interactive_chart(df, symbol="Stock"):
+    """
+    Create a professional interactive candlestick chart using Plotly.
+    Includes Volume, MA indicators, and range selectors.
+    """
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    
+    # 1. Create Subplots: Price (row 1), Volume (row 2)
+    fig = make_subplots(
+        rows=2, cols=1, 
+        shared_xaxes=True, 
+        vertical_spacing=0.05, 
+        row_heights=[0.7, 0.3]
+    )
+    
+    # 2. Add Candlestick
+    fig.add_trace(go.Candlestick(
+        x=df.index,
+        open=df['open'],
+        high=df['high'],
+        low=df['low'],
+        close=df['close'],
+        name='Candlestick',
+        increasing_line_color='#ef5350', # Red for up in A-share
+        decreasing_line_color='#26a69a'  # Green for down in A-share
+    ), row=1, col=1)
+    
+    # 3. Add Moving Averages
+    ma_colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+    for i, period in enumerate([5, 20, 60]):
+        ma = df['close'].rolling(window=period).mean()
+        fig.add_trace(go.Scatter(
+            x=df.index, y=ma, 
+            name=f'MA{period}',
+            line=dict(width=1.5, color=ma_colors[i]),
+            opacity=0.7
+        ), row=1, col=1)
+        
+    # 4. Add Volume
+    colors = ['#ef5350' if row['close'] >= row['open'] else '#26a69a' for _, row in df.iterrows()]
+    fig.add_trace(go.Bar(
+        x=df.index, y=df['volume'],
+        name='Volume',
+        marker_color=colors,
+        opacity=0.5
+    ), row=2, col=1)
+    
+    # 5. Sophisticated Layout
+    fig.update_layout(
+        title=f'{symbol} - 交互式可视化图表',
+        template='plotly_dark',
+        xaxis_rangeslider_visible=False, # Hide the bottom slider to save space
+        height=700,
+        margin=dict(l=50, r=50, t=50, b=50),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    # Y-axis titles
+    fig.update_yaxes(title_text="Price (¥)", row=1, col=1)
+    fig.update_yaxes(title_text="Volume", row=2, col=1)
+    
+    # Range Selectors
+    fig.update_xaxes(
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="YTD", step="year", stepmode="todate"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all")
+            ]),
+            bgcolor='rgba(0,0,0,0)',
+            activecolor='#ff7f0e'
+        )
+    )
+    
+    return fig

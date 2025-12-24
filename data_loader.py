@@ -62,3 +62,44 @@ class DataLoader:
         except Exception as e:
             st.error(f"Error fetching data for {symbol}: {e}")
             return pd.DataFrame()
+
+    def get_realtime_quotes(self, symbol):
+        """Fetch real-time spot price and change for A-share."""
+        try:
+            df = ak.stock_zh_a_spot_em()
+            match = df[df['代码'] == symbol]
+            if not match.empty:
+                return {
+                    'price': float(match['最新价'].values[0]),
+                    'change_pct': float(match['涨跌幅'].values[0]),
+                    'high': float(match['最高'].values[0]),
+                    'low': float(match['最低'].values[0]),
+                    'volume': float(match['成交量'].values[0]),
+                    'name': match['名称'].values[0]
+                }
+            return None
+        except Exception:
+            return None
+
+    def get_intraday_data(self, symbol, period="1"):
+        """Fetch intraday minute-level data from AKShare."""
+        try:
+            # Using stock_zh_a_hist_min_em for intraday
+            df = ak.stock_zh_a_hist_min_em(
+                symbol=symbol,
+                period=period,
+                adjust="qfq"
+            )
+            if df.empty:
+                return pd.DataFrame()
+            
+            # Format: 时间, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 涨跌额, 换手率
+            df = df[['时间', '开盘', '最高', '最低', '收盘', '成交量']]
+            df.columns = ['datetime', 'open', 'high', 'low', 'close', 'volume']
+            df['datetime'] = pd.to_datetime(df['datetime'])
+            df.set_index('datetime', inplace=True)
+            df.sort_index(inplace=True)
+            return df
+        except Exception as e:
+            st.error(f"Error fetching intraday data: {e}")
+            return pd.DataFrame()
